@@ -2,19 +2,34 @@ import { useEffect, useRef, useState } from 'react';
 import { geocode, type GeoResult } from '../lib/weather';
 import { dataStore, type BackupData } from '../store/dataStore';
 import { todayKey } from '../lib/date';
+import {
+  loadSyncConfig,
+  saveSyncConfig,
+  type GithubSyncConfig,
+} from '../lib/githubSync';
+import type { SyncStatus } from '../hooks/useGithubSync';
 import './EventFormModal.css';
 
 interface Props {
   location: GeoResult | null;
   showWeekNumber: boolean;
+  syncStatus: SyncStatus;
   onShowWeekNumberChange: (v: boolean) => void;
   onSave: (location: GeoResult | null) => void;
   onClose: () => void;
 }
 
+const SYNC_STATUS_LABEL: Record<SyncStatus, string> = {
+  idle: '꺼짐',
+  syncing: '동기화 중…',
+  synced: '동기화됨',
+  error: '동기화 실패 (설정/네트워크 확인)',
+};
+
 export function SettingsModal({
   location,
   showWeekNumber,
+  syncStatus,
   onShowWeekNumberChange,
   onSave,
   onClose,
@@ -53,6 +68,13 @@ export function SettingsModal({
     } catch {
       alert('가져오기에 실패했습니다. 파일을 확인하세요.');
     }
+  };
+
+  const [sync, setSync] = useState<GithubSyncConfig>(() => loadSyncConfig());
+  const handleSyncSave = () => {
+    saveSyncConfig(sync);
+    // 켜짐/꺼짐 전환은 앱 시작 시 1회 로직에 반영돼야 하므로 새로고침해 확실히 적용한다.
+    window.location.reload();
   };
 
   const [query, setQuery] = useState(location?.name ?? '');
@@ -178,6 +200,73 @@ export function SettingsModal({
             style={{ display: 'none' }}
             onChange={handleImportFile}
           />
+        </div>
+
+        <div className="field">
+          <span className="field__label">
+            GitHub 자동 동기화 (현재: {SYNC_STATUS_LABEL[syncStatus]})
+          </span>
+          <label className="modal__repeat-toggle">
+            <input
+              type="checkbox"
+              checked={sync.enabled}
+              onChange={(e) => setSync({ ...sync, enabled: e.target.checked })}
+            />
+            <span>켜기 (일정 변경 시 자동으로 백업 파일을 커밋)</span>
+          </label>
+          <div className="field-row">
+            <label className="field">
+              <span className="field__label">owner</span>
+              <input
+                className="field__input"
+                value={sync.owner}
+                placeholder="예: CamperInTheWoods"
+                onChange={(e) => setSync({ ...sync, owner: e.target.value.trim() })}
+              />
+            </label>
+            <label className="field">
+              <span className="field__label">repo</span>
+              <input
+                className="field__input"
+                value={sync.repo}
+                placeholder="예: MONTHLYCALENDER"
+                onChange={(e) => setSync({ ...sync, repo: e.target.value.trim() })}
+              />
+            </label>
+          </div>
+          <div className="field-row">
+            <label className="field">
+              <span className="field__label">branch</span>
+              <input
+                className="field__input"
+                value={sync.branch}
+                onChange={(e) => setSync({ ...sync, branch: e.target.value.trim() })}
+              />
+            </label>
+            <label className="field">
+              <span className="field__label">파일 경로</span>
+              <input
+                className="field__input"
+                value={sync.path}
+                onChange={(e) => setSync({ ...sync, path: e.target.value.trim() })}
+              />
+            </label>
+          </div>
+          <label className="field">
+            <span className="field__label">Personal Access Token (repo 쓰기 권한)</span>
+            <input
+              className="field__input"
+              type="password"
+              value={sync.token}
+              placeholder="ghp_..."
+              onChange={(e) => setSync({ ...sync, token: e.target.value.trim() })}
+            />
+          </label>
+          <div className="field-row">
+            <button className="btn btn--ghost" onClick={handleSyncSave}>
+              동기화 설정 저장
+            </button>
+          </div>
         </div>
 
         <div className="modal__footer">

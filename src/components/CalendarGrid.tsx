@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { toDateKey, todayKey, weekOfYear, WEEKDAY_LABELS } from '../lib/date';
 import type { Category, CalendarEvent, DayNote } from '../types';
 import type { DayWeather, WeatherCategory } from '../lib/weather';
@@ -11,6 +11,11 @@ const MAX_VISIBLE_PER_DAY = 3;
 const WEEK_HEIGHT = 108;
 const WEEK_HEIGHT_FAR = 30; // 멀리 보기(축소) 주 높이
 const MAX_DOTS = 6;
+
+// 크게 보기(현재 주 확대) 모드
+const NEAR_SMALL_HEIGHT = WEEK_HEIGHT; // 포커스 아닌 주는 기본 보기와 같은 높이
+const NEAR_FOCUS_MAX_VISIBLE = 15; // 포커스된 주의 하루 최대 표시 일정 수
+const NEAR_FOCUS_MIN_HEIGHT = 360; // 실측 전 초기 추정 높이
 
 // 운동 모드: 고정 부위 슬롯(위→아래 순서). 제목에 부위명이 포함되면 해당 슬롯에 표시.
 const WORKOUT_PARTS = ['어깨', '가슴', '등', '하체'];
@@ -51,6 +56,7 @@ interface Props {
   workout: boolean; // 운동 부위 슬롯 표시 여부
   workoutColor: string;
   zoomFar: boolean; // 멀리 보기(축소)
+  zoomNear: boolean; // 크게 보기(현재 주 확대)
   showWeekNumber: boolean;
   dayNotes: Map<string, DayNote>;
   // 특정 날짜(키)로 스크롤. nonce가 바뀔 때마다 재실행.
@@ -71,6 +77,7 @@ export function CalendarGrid({
   workout,
   workoutColor,
   zoomFar,
+  zoomNear,
   showWeekNumber,
   dayNotes,
   scrollTarget,
@@ -81,6 +88,9 @@ export function CalendarGrid({
   onToggleDone,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const focusedRowRef = useRef<HTMLDivElement>(null);
+  const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
+  const [focusedHeight, setFocusedHeight] = useState(NEAR_FOCUS_MIN_HEIGHT);
 
   const colorByCategory = useMemo(() => {
     const m = new Map<string, string>();
@@ -165,26 +175,80 @@ export function CalendarGrid({
   const today = todayKey();
   const weekHeight = zoomFar ? WEEK_HEIGHT_FAR : WEEK_HEIGHT;
 
-  // scrollTarget이 바뀌면 해당 날짜가 속한 주를 맨 위로 스크롤.
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el || weeks.length === 0) return;
+  // 날짜 키가 속한 주가 weeks 배열에서 몇 번째인지 계산.
+  const weekIndexForKey = (key: string) => {
+    if (weeks.length === 0) return 0;
     const first = weeks[0][0]; // 첫 주 일요일
-    const [ty, tm, td] = scrollTarget.key.split('-').map(Number);
+    const [ty, tm, td] = key.split('-').map(Number);
     const target = new Date(ty, tm - 1, td);
     target.setDate(target.getDate() - target.getDay()); // 대상 주 일요일
     const idx = Math.round(
       (target.getTime() - first.getTime()) / (7 * 86400000),
     );
-    const clamped = Math.min(Math.max(idx, 0), weeks.length - 1);
-    el.scrollTo({ top: clamped * weekHeight });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scrollTarget, zoomFar]);
+    return Math.min(Math.max(idx, 0), weeks.length - 1);
+  };
 
-  // 스크롤 시 맨 위에 보이는 주의 달을 헤더에 알림.
+  // 크게 보기: 포커스 주(focusedIndex)는 focusedHeight만큼, 나머지는 NEAR_SMALL_HEIGHT만큼 차지한다고
+  // 가정하고, 스크롤 컨테이너 내 세로 offset이 몇 번째 주에 해당하는지 역산.
+  const nearIndexAtOffset = (offset: number) => {
+    const f = focusedIndex ?? 0;
+    const beforeEnd = f * NEAR_SMALL_HEIGHT;
+    const focusEnd = beforeEnd + focusedHeight;
+    let idx: number;
+    if (offset < beforeEnd) idx = Math.floor(offset / NEAR_SMALL_HEIGHT);
+    else if (offset < focusEnd) idx = f;
+    else idx = f + 1 + Math.floor((offset - focusEnd) / NEAR_SMALL_HEIGHT);
+    return Math.min(Math.max(idx, 0), weeks.length - 1);
+  };
+
+  // scrollTarget/zoomNear가 바뀌면 포커스 주 인덱스를 그 즉시(렌더 중) 맞춰둔다.
+  // (React 권장 패턴: 외부 신호에 따른 state 조정은 effect가 아니라 렌더 중에 처리)
+  const syncKey = `${zoomNear}:${scrollTarget.nonce}`;
+  const [prevSyncKey, setPrevSyncKey] = useState(syncKey);
+  if (zoomNear && syncKey !== prevSyncKey) {
+    setPrevSyncKey(syncKey);
+    setFocusedIndex(weekIndexForKey(scrollTarget.key));
+  } else if (!zoomNear && syncKey !== prevSyncKey) {
+    setPrevSyncKey(syncKey);
+  }
+
+  // scrollTarget이 바뀌면 해당 날짜가 속한 주로 스크롤 위치를 맞춘다.
+  // - 기본/멀리 보기: 그 주를 맨 위로.
+  // - 크게 보기: 포커스(확대)된 그 주를 맨 위로.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || weeks.length === 0) return;
+    const idx = weekIndexForKey(scrollTarget.key);
+    if (zoomNear) {
+      el.scrollTop = idx * NEAR_SMALL_HEIGHT;
+    } else {
+      el.scrollTo({ top: idx * weekHeight });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scrollTarget, zoomFar, zoomNear]);
+
+  // 포커스된 주 행의 실제 높이를 측정해 offset 역산에 반영.
+  // (매 렌더마다 재측정: 일정 개수 변화로 포커스 주 높이가 바뀔 수 있음)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useLayoutEffect(() => {
+    if (!zoomNear) return;
+    const h = focusedRowRef.current?.offsetHeight;
+    if (h && Math.abs(h - focusedHeight) > 1) setFocusedHeight(h);
+  });
+
+  // 크게 보기에서 포커스 주를 바꾸는 유일한 방법: 날짜/주차를 직접 클릭.
+  // (스크롤로 자동 전환되지 않음 — 스크롤 위치를 흔드는 문제가 있었음)
+  const pinWeek = (i: number) => setFocusedIndex(i);
+
+  // 스크롤 시 맨 위에 보이는 주의 달을 헤더에 알린다. 크게 보기에서는 포커스 주를 바꾸지 않는다.
   const onScroll = () => {
     const el = scrollRef.current;
     if (!el) return;
+    if (zoomNear) {
+      const wk = weeks[nearIndexAtOffset(el.scrollTop)];
+      if (wk) onVisibleMonthChange(wk[4].getFullYear(), wk[4].getMonth());
+      return;
+    }
     const idx = Math.round(el.scrollTop / weekHeight);
     const wk = weeks[Math.min(Math.max(idx, 0), weeks.length - 1)];
     if (wk) {
@@ -193,14 +257,23 @@ export function CalendarGrid({
     }
   };
 
-  const renderDay = (day: Date) => {
+  const renderDay = (
+    day: Date,
+    opts: { farLike?: boolean; expanded?: boolean; weekIndex?: number } = {},
+  ) => {
+    const farLike = opts.farLike ?? zoomFar;
+    const maxVisible = opts.expanded ? NEAR_FOCUS_MAX_VISIBLE : MAX_VISIBLE_PER_DAY;
     const key = toDateKey(day);
+    const selectDay = () => {
+      if (zoomNear && opts.weekIndex !== undefined) pinWeek(opts.weekIndex);
+      onSelectDay(key);
+    };
     const allDayEvents = eventsByDate.get(key) ?? [];
     const bars = bottomBars.get(key) ?? [];
     const dayEvents = allDayEvents.filter(
       (e) => e.kind === 'event' || e.kind === 'task',
     );
-    const visible = dayEvents.slice(0, MAX_VISIBLE_PER_DAY);
+    const visible = dayEvents.slice(0, maxVisible);
     const hiddenCount = dayEvents.length - visible.length;
     const dayWeather = weather.get(key);
     const note = dayNotes.get(key);
@@ -218,8 +291,8 @@ export function CalendarGrid({
     else if (viewMode === 'weather' && dayWeather)
       bg = WEATHER_BG[dayWeather.category];
 
-    // 멀리 보기: 배경색(날씨/온도/별점) + 일정 점만 간단히.
-    if (zoomFar) {
+    // 멀리 보기 / 크게 보기의 축소 주: 배경색(날씨/온도/별점) + 일정 점만 간단히.
+    if (farLike) {
       const dots = allDayEvents.slice(0, MAX_DOTS);
       return (
         <div
@@ -228,7 +301,7 @@ export function CalendarGrid({
             bg ? (fg ? 'has-bg-rating' : 'has-bg') : ''
           }`}
           style={bg ? { background: bg, color: fg } : undefined}
-          onClick={() => onSelectDay(key)}
+          onClick={selectDay}
         >
           <span className="calendar__daynum-far">
             {isFirst ? `${day.getMonth() + 1}/1` : day.getDate()}
@@ -288,7 +361,7 @@ export function CalendarGrid({
               className={`calendar__daynum ${isFirst ? 'is-first' : ''}`}
               onClick={(e) => {
                 e.stopPropagation();
-                onSelectDay(key);
+                selectDay();
               }}
             >
               {isFirst ? `${day.getMonth() + 1}/1` : day.getDate()}
@@ -429,26 +502,39 @@ export function CalendarGrid({
           </div>
         ))}
       </div>
-      <div className="calendar__scroll" ref={scrollRef} onScroll={onScroll}>
-        {weeks.map((week) => (
-          <div
-            className={`calendar__week ${showWeekNumber ? 'has-weeknum' : ''} ${
-              zoomFar ? 'is-far' : ''
-            }`}
-            key={toDateKey(week[0])}
-          >
-            {showWeekNumber && (
-              <button
-                className="calendar__weeknum"
-                onClick={() => onSelectWeek(toDateKey(week[0]))}
-                title="이 주 요약"
-              >
-                {weekOfYear(week[4])}
-              </button>
-            )}
-            {week.map(renderDay)}
-          </div>
-        ))}
+      <div
+        className={`calendar__scroll ${zoomNear ? 'is-near' : ''}`}
+        ref={scrollRef}
+        onScroll={onScroll}
+      >
+        {weeks.map((week, i) => {
+          const isFocused = zoomNear && focusedIndex === i;
+          return (
+            <div
+              className={`calendar__week ${showWeekNumber ? 'has-weeknum' : ''} ${
+                zoomFar ? 'is-far' : ''
+              } ${isFocused ? 'is-near-focus' : ''}`}
+              key={toDateKey(week[0])}
+              ref={isFocused ? focusedRowRef : undefined}
+            >
+              {showWeekNumber && (
+                <button
+                  className="calendar__weeknum"
+                  onClick={() => {
+                    if (zoomNear) pinWeek(i);
+                    else onSelectWeek(toDateKey(week[0]));
+                  }}
+                  title={zoomNear ? '이 주 확대' : '이 주 요약'}
+                >
+                  {weekOfYear(week[4])}
+                </button>
+              )}
+              {week.map((day) =>
+                renderDay(day, { farLike: zoomFar, expanded: isFocused, weekIndex: i }),
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

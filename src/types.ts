@@ -63,3 +63,13 @@ export interface Recurrence {
   memo: string | null;
   updatedAt: number;
 }
+
+// 삭제 기록(무덤). 다른 기기와 병합할 때, 상대가 더 오래된 레코드를 들고 있어도
+// 삭제가 되살아나지(resurrect) 않도록 남겨둔다.
+export type TombstoneStore = 'categories' | 'events' | 'recurrences' | 'dayNotes';
+export interface Tombstone {
+  key: string; // `${store}:${refId}` (idb keyPath)
+  store: TombstoneStore;
+  refId: string; // 원본 id (dayNotes는 date)
+  deletedAt: number;
+}

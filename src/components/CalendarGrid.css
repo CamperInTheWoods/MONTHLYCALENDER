@@ -86,6 +86,20 @@
   height: 30px; /* WEEK_HEIGHT_FAR와 일치 */
 }
 
+/* 크게 보기: 포커스 주 전환/정렬은 JS(스크롤 멈춘 뒤 재계산)로 직접 제어하므로
+   브라우저 자체 스냅과 충돌하지 않게 끈다. */
+.calendar__scroll.is-near {
+  scroll-snap-type: none;
+}
+/* 크게 보기에서 포커스된 주: 높이를 내용(최대 15개 일정)에 맞춰 확장 */
+.calendar__week.is-near-focus {
+  height: auto;
+  min-height: 360px;
+}
+.calendar__week.is-near-focus .calendar__day {
+  overflow: visible;
+}
+
 /* 멀리 보기 셀: 날짜(작게) + 일정 점 */
 .calendar__day.is-far {
   padding: 1px 2px;

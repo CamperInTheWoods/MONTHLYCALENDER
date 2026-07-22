@@ -9,6 +9,7 @@ import { SettingsModal } from './components/SettingsModal';
 import { WeekSummaryModal } from './components/WeekSummaryModal';
 import { TabBar, type ActiveTab } from './components/TabBar';
 import { useAppData } from './hooks/useAppData';
+import { useGithubSync } from './hooks/useGithubSync';
 import { useWeather } from './hooks/useWeather';
 import { addMonths, buildWeeksRange, formatMonthTitle, toDateKey } from './lib/date';
 import {
@@ -41,6 +42,11 @@ function App() {
     dayNotes,
     saveDayNote,
   } = useAppData();
+  // 시작 시 원격과 병합(있으면 새로고침해 반영), 이후 데이터가 바뀔 때마다 디바운스 후 자동 push.
+  const { status: syncStatus } = useGithubSync(
+    [categories, events, dayNotes],
+    () => window.location.reload(),
+  );
   const now = new Date();
   // anchor: 렌더 범위 중심월. visibleMonth: 스크롤로 실제 보이는 달(헤더 표시).
   const [anchor, setAnchor] = useState({ year: now.getFullYear(), month: now.getMonth() });
@@ -55,7 +61,7 @@ function App() {
   const [weekStart, setWeekStart] = useState<string | null>(null);
   const [briefCategory, setBriefCategory] = useState<Category | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [zoomFar, setZoomFar] = useState(false);
+  const [zoomMode, setZoomMode] = useState<'normal' | 'far' | 'near'>('normal');
   const [settings, setSettings] = useState<AppSettings>(() => loadSettings());
 
   const updateSettings = (patch: Partial<AppSettings>) => {
@@ -247,6 +253,39 @@ function App() {
     (b) => b.mode !== 'workout' || !!workoutCategory,
   );
 
+  const ZOOM_BUTTONS: { mode: 'normal' | 'far' | 'near'; label: string; icon: React.ReactNode }[] = [
+    {
+      mode: 'normal',
+      label: '기본',
+      icon: (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="4" width="18" height="18" rx="2" />
+          <path d="M3 10h18M9 4v18" />
+        </svg>
+      ),
+    },
+    {
+      mode: 'far',
+      label: '멀리',
+      icon: (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="11" cy="11" r="7" />
+          <path d="M21 21l-4-4M8 11h6" />
+        </svg>
+      ),
+    },
+    {
+      mode: 'near',
+      label: '크게',
+      icon: (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="11" cy="11" r="7" />
+          <path d="M21 21l-4-4M11 8v6M8 11h6" />
+        </svg>
+      ),
+    },
+  ];
+
   return (
     <div className="app">
       <header className="app__header">
@@ -276,24 +315,20 @@ function App() {
           <button className="today-btn" onClick={goToday}>
             오늘
           </button>
-          <button
-            className={`nav-btn ${zoomFar ? 'is-on' : ''}`}
-            onClick={() => setZoomFar((v) => !v)}
-            aria-label="멀리 보기"
-            title={zoomFar ? '기본 보기' : '멀리 보기(1년 훑기)'}
-          >
-            {zoomFar ? (
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="11" cy="11" r="7" />
-                <path d="M21 21l-4-4M11 8v6M8 11h6" />
-              </svg>
-            ) : (
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="11" cy="11" r="7" />
-                <path d="M21 21l-4-4M8 11h6" />
-              </svg>
-            )}
-          </button>
+          <div className="app__zoommodes">
+            {ZOOM_BUTTONS.map((b) => (
+              <button
+                key={b.mode}
+                className={`mode-btn ${zoomMode === b.mode ? 'is-on' : ''}`}
+                onClick={() => setZoomMode(b.mode)}
+                aria-pressed={zoomMode === b.mode}
+                title={b.label}
+              >
+                {b.icon}
+                {b.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="app__modes">
@@ -360,7 +395,8 @@ function App() {
             viewMode={settings.viewMode}
             workout={workoutMode}
             workoutColor={activeCategory?.color ?? '#3b6ef5'}
-            zoomFar={zoomFar}
+            zoomFar={zoomMode === 'far'}
+            zoomNear={zoomMode === 'near'}
             showWeekNumber={settings.showWeekNumber}
             dayNotes={dayNotes}
             scrollTarget={scrollTarget}
@@ -382,6 +418,7 @@ function App() {
           dateKey={eventModal.dateKey}
           event={eventModal.event}
           categories={categories}
+          defaultCategoryId={activeTab === 'all' ? undefined : activeTab}
           onSave={handleSaveEvent}
           onSaveMany={handleSaveManyEvents}
           onSaveRecurrence={handleSaveRecurrence}
@@ -470,6 +507,7 @@ function App() {
         <SettingsModal
           location={settings.location}
           showWeekNumber={settings.showWeekNumber}
+          syncStatus={syncStatus}
           onShowWeekNumberChange={(v) => updateSettings({ showWeekNumber: v })}
           onSave={(location: GeoResult | null) => {
             updateSettings({ location });

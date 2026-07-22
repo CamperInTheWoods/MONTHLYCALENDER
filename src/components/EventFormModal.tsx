@@ -22,6 +22,8 @@ interface Props {
   dateKey: string;
   event: CalendarEvent | null;
   categories: Category[];
+  // 신규 등록 시 기본 선택할 카테고리(활성 탭이 특정 분류면 그 분류)
+  defaultCategoryId?: string;
   onSave: (event: CalendarEvent) => void;
   onSaveMany: (events: CalendarEvent[]) => void; // 여러 날짜 일괄 등록
   onSaveRecurrence: (recurrence: Recurrence) => void;
@@ -34,6 +36,7 @@ export function EventFormModal({
   dateKey,
   event,
   categories,
+  defaultCategoryId,
   onSave,
   onSaveMany,
   onSaveRecurrence,
@@ -43,7 +46,7 @@ export function EventFormModal({
 }: Props) {
   const [title, setTitle] = useState(event?.title ?? '');
   const [categoryId, setCategoryId] = useState(
-    event?.categoryId ?? categories[0]?.id ?? '',
+    event?.categoryId ?? defaultCategoryId ?? categories[0]?.id ?? '',
   );
   const [date, setDate] = useState(event?.date ?? dateKey);
   const [endDate, setEndDate] = useState(event?.endDate ?? dateKey); // 기간 끝일
