@@ -1,0 +1,66 @@
+/* 디자인 토큰. 색상은 하드코딩하지 않고 이 변수들을 통해 사용한다.
+   추후 다크모드는 [data-theme="dark"] 블록을 추가해 토큰만 덮어쓰면 된다. */
+:root {
+  --color-bg: #ffffff;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f7f8fa;
+  --color-border: #e3e6ea;
+  --color-text: #1d2129;
+  --color-text-muted: #6b7280;
+  --color-text-faint: #aab1ba;
+  --color-accent: #3b6ef5;
+  --color-today-bg: #eef3ff;
+  --color-overlay: rgba(17, 24, 39, 0.45);
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+
+  --font-sm: 12px;
+  --font-md: 14px;
+  --font-lg: 18px;
+
+  /* 날씨모드 셀 배경색 (서로 대비가 크게, 비는 진한 청색으로 뚜렷하게) */
+  --weather-clear: #8fc0ff; /* 맑음 - 선명한 하늘파랑 */
+  --weather-cloudy: #cfe0ee; /* 구름 - 연한 회하늘 */
+  --weather-overcast: #aeb7c1; /* 흐림 - 뚜렷한 회색 */
+  --weather-rain: #6d88c9; /* 비 - 진한 청색 */
+  --weather-snow: #eef4fb; /* 눈 - 아주 연한 흰파랑 */
+
+  /* 기본 카테고리 팔레트 프리셋 */
+  --palette-1: #3b6ef5;
+  --palette-2: #e0496b;
+  --palette-3: #2bae66;
+  --palette-4: #f5a623;
+  --palette-5: #8b5cf6;
+  --palette-6: #14b8a6;
+}
+
+[data-theme='gray'] {
+  --color-bg: #e8ecf2;
+  --color-surface: #f4f7fb;
+  --color-surface-muted: #dfe4ed;
+  --color-border: #cdd5e1;
+  --color-text: #2b323c;
+  --color-text-muted: #69727f;
+  --color-text-faint: #a2acba;
+  --color-accent: #4a6fa5;
+  --color-today-bg: #d6e1f0;
+  --color-overlay: rgba(30, 40, 55, 0.4);
+}
+
+[data-theme='dark'] {
+  --color-bg: #16181d;
+  --color-surface: #1e2128;
+  --color-surface-muted: #272b33;
+  --color-border: #333842;
+  --color-text: #e6e8eb;
+  --color-text-muted: #9aa1ab;
+  --color-text-faint: #5f6670;
+  --color-accent: #5b8def;
+  --color-today-bg: #233048;
+  --color-overlay: rgba(0, 0, 0, 0.6);
+}

@@ -1,0 +1,47 @@
+.stars {
+  display: inline-flex;
+  gap: var(--space-1);
+}
+
+.stars__item {
+  position: relative;
+  display: inline-block;
+  color: var(--color-text-faint); /* 빈 별 색 */
+}
+
+.stars__bg,
+.stars__fg {
+  position: absolute;
+  inset: 0;
+  display: block;
+}
+.stars__bg svg,
+.stars__fg svg {
+  display: block;
+}
+
+.stars__fg {
+  color: #f5a623; /* 채운 별 색 */
+  overflow: hidden;
+}
+.stars__fg.is-half {
+  width: 50%;
+}
+
+.stars__half {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 50%;
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  z-index: 1;
+}
+.stars__half--l {
+  left: 0;
+}
+.stars__half--r {
+  right: 0;
+}

@@ -1,0 +1,395 @@
+.calendar {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0; /* 그리드가 부모 높이를 넘지 않고 한 화면에 들어오도록 */
+}
+
+.calendar__weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  border-bottom: 1px solid var(--color-border);
+}
+.calendar__weekdays.has-weeknum {
+  grid-template-columns: 24px repeat(7, 1fr);
+}
+
+.calendar__weeknum-head {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  color: var(--color-text-faint);
+}
+
+.calendar__weeknum {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  color: var(--color-text-faint);
+  font-variant-numeric: tabular-nums;
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 0;
+}
+.calendar__weeknum:hover {
+  color: var(--color-accent);
+}
+
+.calendar__weekday {
+  text-align: center;
+  padding: var(--space-2) 0;
+  font-size: var(--font-sm);
+  color: var(--color-text-muted);
+}
+.calendar__weekday.is-sun {
+  color: #e0496b;
+}
+.calendar__weekday.is-sat {
+  color: #3b6ef5;
+}
+
+/* 세로 스크롤 컨테이너: 주 단위 스냅으로 어중간하게 멈추지 않게 한다. */
+.calendar__scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scroll-snap-type: y mandatory;
+  overscroll-behavior: contain;
+  /* 스크롤바 색을 테마에 맞춤 (다크에선 어두운 회색) */
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-text-faint) transparent;
+}
+.calendar__scroll::-webkit-scrollbar {
+  width: 8px;
+}
+.calendar__scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.calendar__scroll::-webkit-scrollbar-thumb {
+  background: var(--color-text-faint);
+  border-radius: 4px;
+}
+
+.calendar__week {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  height: 108px; /* WEEK_HEIGHT와 일치 */
+  scroll-snap-align: start;
+}
+.calendar__week.has-weeknum {
+  grid-template-columns: 24px repeat(7, 1fr);
+}
+.calendar__week.is-far {
+  height: 30px; /* WEEK_HEIGHT_FAR와 일치 */
+}
+
+/* 멀리 보기 셀: 날짜(작게) + 일정 점 */
+.calendar__day.is-far {
+  padding: 1px 2px;
+  gap: 0;
+  overflow: hidden;
+}
+.calendar__daynum-far {
+  font-size: 9px;
+  line-height: 1.1;
+  color: var(--color-text-muted);
+}
+.calendar__day.is-far.has-bg .calendar__daynum-far,
+.calendar__day.is-far.has-bg-rating .calendar__daynum-far {
+  color: #1d2129;
+}
+.calendar__fardots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1px;
+  align-content: flex-start;
+}
+.calendar__fardot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+}
+
+.calendar__day {
+  border-right: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+  padding: var(--space-1);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+  cursor: pointer;
+}
+.calendar__day:last-child {
+  border-right: none;
+}
+.calendar__day.is-outside .calendar__daynum {
+  color: var(--color-text-faint);
+}
+.calendar__day.is-today {
+  background: var(--color-today-bg);
+}
+
+/* 날씨/평점/기온 배경(밝은 파스텔)이 깔린 칸은 글자를 어둡게 고정해
+   다크모드에서도 가독성을 유지한다. */
+.calendar__day.has-bg .calendar__daynum,
+.calendar__day.has-bg .calendar__weather,
+.calendar__day.has-bg .calendar__temp,
+.calendar__day.has-bg .calendar__memo {
+  color: #1d2129;
+}
+.calendar__day.has-bg .calendar__temp .is-extreme {
+  color: #1d2129;
+}
+
+/* 평점 모드: 셀에 지정한 글자색(밝거나 어두움)을 그대로 따른다 */
+.calendar__day.has-bg-rating .calendar__daynum,
+.calendar__day.has-bg-rating .calendar__memo {
+  color: inherit;
+}
+
+.calendar__dayhead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2px;
+}
+
+.calendar__weather {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--color-text-muted);
+  min-width: 0;
+  overflow: hidden;
+}
+
+.calendar__temp {
+  font-size: 10px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.calendar__temp .is-extreme {
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.calendar__dayright {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: auto; /* 날씨가 없어도 항상 오른쪽 */
+}
+
+.calendar__rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  font-size: 10px;
+  line-height: 1;
+  color: #f5a623;
+  font-variant-numeric: tabular-nums;
+}
+
+.calendar__monthlabel {
+  font-size: var(--font-sm);
+  font-weight: 600;
+  color: var(--color-accent);
+}
+
+.calendar__daynum {
+  font-size: var(--font-sm);
+  color: var(--color-text);
+  border: none;
+  background: none;
+  padding: 0 2px;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+.calendar__daynum.is-first {
+  font-weight: 600;
+  color: var(--color-accent);
+}
+.calendar__daynum:hover {
+  background: var(--color-surface-muted);
+}
+
+.calendar__events {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+  flex: 1; /* 남은 공간을 차지해 마감 막대를 셀 하단으로 밀어냄 */
+  min-height: 0;
+}
+
+/* 운동 모드: 부위별 고정 슬롯(머리/어깨/가슴/하체). 빈 부위도 자리를 유지해 위치 고정. */
+.calendar__workout {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.calendar__wslot {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.calendar__wpart {
+  flex: 1;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: #fff;
+  font-size: var(--font-sm);
+  line-height: 1.2;
+  text-align: left;
+  padding: 0 5px;
+  cursor: pointer;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+/* PT(퍼스널) 운동: 살짝 진한 주황 안쪽 테두리 */
+.calendar__wpart.is-pt {
+  box-shadow: inset 0 0 0 2px #e08a2b;
+}
+
+/* 평점 모드에서 일정 대신 보여주는 하루 메모 */
+.calendar__memo {
+  flex: 1;
+  min-height: 0;
+  font-size: var(--font-sm);
+  line-height: 1.35;
+  color: var(--color-text);
+  white-space: pre-wrap;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  padding: 0 2px;
+}
+
+/* 마감일정: 셀 하단, 좌(투명)→우(진함) 그라데이션 막대 */
+.calendar__deadlines {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.calendar__deadline {
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 1px 5px;
+  font-size: var(--font-sm);
+  line-height: 1.5;
+  color: var(--color-text);
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  background: linear-gradient(
+    to right,
+    color-mix(in srgb, var(--cat), transparent 100%),
+    var(--cat)
+  );
+}
+
+/* 기간 시작: 왼쪽 진함 -> 오른쪽 페이드아웃 (텍스트는 진한 왼쪽에) */
+.calendar__bar--start {
+  background: linear-gradient(
+    to right,
+    var(--cat),
+    color-mix(in srgb, var(--cat), transparent 100%)
+  );
+  color: #fff;
+  text-align: left;
+}
+/* 기간 끝 / 마감: 왼쪽 페이드인 -> 오른쪽 진함 (텍스트는 진한 오른쪽에) */
+.calendar__bar--end,
+.calendar__bar--deadline {
+  text-align: right;
+  color: #fff;
+}
+
+.calendar__event {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 1px 5px;
+  font-size: var(--font-sm);
+  line-height: 1.5;
+  color: #fff;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  opacity: 0.85;
+}
+
+.calendar__event-time {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+}
+
+/* 할 일(체크리스트) 일정: 연한 바탕 + 체크박스 */
+.calendar__task {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: var(--radius-sm);
+  padding: 1px 4px;
+  font-size: var(--font-sm);
+  line-height: 1.5;
+  background: color-mix(in srgb, var(--cat) 14%, var(--color-surface));
+  overflow: hidden;
+}
+
+.calendar__check {
+  display: flex;
+  align-items: center;
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--cat);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.calendar__task-title {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: var(--color-text);
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  flex: 1;
+  min-width: 0;
+}
+
+.calendar__task.is-done {
+  opacity: 0.55;
+}
+.calendar__task.is-done .calendar__task-title {
+  text-decoration: line-through;
+}
+
+.calendar__more {
+  font-size: var(--font-sm);
+  color: var(--color-text-muted);
+  padding: 0 5px;
+}
