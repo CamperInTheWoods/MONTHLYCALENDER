@@ -1,73 +1,55 @@
-# React + TypeScript + Vite
+# 레이어 캘린더 (Layer Calendar)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+카테고리별 일정을 "레이어"로 겹쳐 보거나 따로 보는 달력 앱. 일정 관리에 더해
+날씨·기온·별점·운동 같은 여러 "보기 모드"로 하루하루를 색으로 훑어볼 수 있다.
 
-Currently, two official plugins are available:
+## 주요 기능
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- **카테고리 레이어 / 탭** — 카테고리별 색, 드래그로 순서(=겹침 우선순위) 변경, "전체" 겹쳐보기
+- **일정 종류** — 일반 · 할 일(체크) · 마감(셀 하단 막대) · 기간(시작~끝, 시작=페이드아웃/끝=마감 스타일)
+- **여러 날짜 일괄 등록**, 반복 일정(요일/격주/월간/순번요일 + 종료조건), 시작·끝 시간
+- **세로 스크롤 달력** — 주 단위 스냅, 좌우 화살표로 먼 달 점프, "오늘" 복귀, "멀리 보기"(1년 훑기)
+- **보기 모드** (한 번에 하나)
+  - 일반 / 별점(평점 색) / 날씨(분류 색+아이콘+기온) / 기온(온도 색) / 운동(부위 슬롯)
+  - 날씨·기온은 [Open-Meteo](https://open-meteo.com/)로 위치 기반 조회 (설정에 도시 입력)
+- **하루 기록** — 날짜 클릭 시 그날 일정 모달 / 별점 모드에선 평점·메모 모달
+- **주 요약** — 주차 숫자 클릭 시 그 주 7일 정리
+- **카테고리 브리핑** — 그 카테고리의 다가오는 일정 목록
+- **운동 모드** — 카테고리에 켜면 어깨·가슴·등·하체 고정 슬롯, 운동일부터 3일 페이드아웃, "PT" 포함 시 주황 테두리
+- **테마** — 라이트 / 회색 / 다크 (왼쪽 아래 버튼 순환)
+- **데이터 내보내기/가져오기(JSON)** — 기기 간 이전용
 
-## React Compiler
+## 기술
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- Vite + React + TypeScript
+- 로컬 저장: IndexedDB (`idb`) — 저장소 접근은 `src/store/dataStore.ts` 로 추상화(추후 서버 동기화 교체 대비)
+- 색상은 CSS 변수(디자인 토큰)로 관리, 이모지 없이 SVG 라인 아이콘
 
-## Expanding the ESLint configuration
+## 실행
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
+npm run dev      # 개발 서버 (http://localhost:5173)
+npm run build    # 프로덕션 빌드 -> dist/
+npm run preview  # 빌드 결과 미리보기
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## 데이터 저장과 기기 간 이전
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+일정·평점 등 데이터는 **브라우저 IndexedDB(기기별 로컬)** 에 저장된다. git으로는
+코드만 옮겨지고 데이터는 따라가지 않으므로, 기기를 옮길 땐:
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+1. 설정(왼쪽 위 톱니) → **내보내기(JSON)** 로 백업 파일 저장
+2. 다른 기기의 앱에서 설정 → **가져오기** 로 그 파일 불러오기
+
+## 폴더 구조
+
+```
+src/
+  lib/         순수 로직 (날짜·주차·반복·날씨·색)
+  store/       IndexedDB 저장소 추상화(dataStore)
+  hooks/       데이터/날씨 로딩 훅
+  components/  달력 그리드, 탭바, 각종 모달
+  styles/      디자인 토큰(테마)
+  types.ts     데이터 모델
 ```
