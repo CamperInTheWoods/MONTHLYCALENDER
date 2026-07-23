@@ -49,7 +49,10 @@ export interface DataStore {
 
   // 다른 기기(원격)의 백업과 로컬을 레코드 단위로 병합한다. (id별 updatedAt이 최신인 쪽 채택,
   // 삭제(tombstone)가 더 최신이면 삭제 유지). 병합 결과로 로컬을 덮어쓰고, 그 결과를 반환한다.
-  mergeAll(remote: BackupData): Promise<BackupData>;
+  // changed: 카테고리/일정/반복/메모 중 실제로 로컬과 달라진 게 있었는지(원격에서 채택되거나
+  // 삭제된 게 있었는지). 화면 새로고침 여부를 이 값으로 판단해, 변화가 없는데도 매번
+  // 새로고침되는 걸 막는다.
+  mergeAll(remote: BackupData): Promise<{ data: BackupData; changed: boolean }>;
 }
 
 function tombKey(store: TombstoneStore, refId: string): string {
@@ -124,6 +127,15 @@ function mergeEntities<T extends { updatedAt: number }>(
     if (cur && deletedAt >= cur.updatedAt) map.delete(key);
   }
   return [...map.values()];
+}
+
+// merged가 local과 실질적으로 같은 집합인지 확인한다. mergeEntities는 로컬이 이긴 항목의
+// 객체 참조를 그대로 유지하므로, "개수가 같고 merged의 모든 항목이 local에도 있는 그 객체"이면
+// 변경이 없는 것이다(원격에서 새로 채택되거나 삭제된 항목이 하나도 없었다는 뜻).
+function differsFromLocal<T>(local: T[], merged: T[]): boolean {
+  if (local.length !== merged.length) return true;
+  const localSet = new Set(local);
+  return merged.some((item) => !localSet.has(item));
 }
 
 function mergeTombstones(local: Tombstone[], remote: Tombstone[]): Tombstone[] {
@@ -291,14 +303,23 @@ const idbStore: DataStore = {
     ]);
     await tx.done;
 
+    const changed =
+      differsFromLocal(localCats, mergedCats) ||
+      differsFromLocal(localEvs, mergedEvs) ||
+      differsFromLocal(localRecs, mergedRecs) ||
+      differsFromLocal(localNotes, mergedNotes);
+
     return {
-      version: BACKUP_VERSION,
-      exportedAt: Date.now(),
-      categories: mergedCats,
-      events: mergedEvs,
-      recurrences: mergedRecs,
-      dayNotes: mergedNotes,
-      tombstones: mergedTombs,
+      data: {
+        version: BACKUP_VERSION,
+        exportedAt: Date.now(),
+        categories: mergedCats,
+        events: mergedEvs,
+        recurrences: mergedRecs,
+        dayNotes: mergedNotes,
+        tombstones: mergedTombs,
+      },
+      changed,
     };
   },
 };

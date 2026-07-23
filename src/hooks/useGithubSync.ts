@@ -26,8 +26,13 @@ export function useGithubSync(deps: unknown[], onMerged: () => void) {
       try {
         const remote = await pullRemote(cfg);
         if (remote) {
-          await dataStore.mergeAll(remote.data);
-          onMerged();
+          const { changed } = await dataStore.mergeAll(remote.data);
+          // 실제로 로컬과 달라진 게 있을 때만 새로고침한다. 그렇지 않으면
+          // (원격이 항상 존재하는 상태에서) 켤 때마다 무한 새로고침되는 버그가 생긴다.
+          if (changed) {
+            onMerged();
+            return;
+          }
         }
         setStatus('synced');
       } catch (err) {
@@ -48,7 +53,7 @@ export function useGithubSync(deps: unknown[], onMerged: () => void) {
       // 다른 기기가 그새 올린 변경이 있을 수 있으니, push 전에 항상 다시 받아 병합한다.
       const remote = await pullRemote(cfg);
       const merged = remote
-        ? await dataStore.mergeAll(remote.data)
+        ? (await dataStore.mergeAll(remote.data)).data
         : await dataStore.exportAll();
       await pushRemote(cfg, merged, remote?.sha ?? null);
       setStatus('synced');

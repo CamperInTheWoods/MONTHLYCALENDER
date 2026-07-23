@@ -4,6 +4,8 @@ import { dataStore, type BackupData } from '../store/dataStore';
 import { todayKey } from '../lib/date';
 import {
   loadSyncConfig,
+  pullRemote,
+  pushRemote,
   saveSyncConfig,
   type GithubSyncConfig,
 } from '../lib/githubSync';
@@ -75,6 +77,66 @@ export function SettingsModal({
     saveSyncConfig(sync);
     // 켜짐/꺼짐 전환은 앱 시작 시 1회 로직에 반영돼야 하므로 새로고침해 확실히 적용한다.
     window.location.reload();
+  };
+
+  const [forcePushState, setForcePushState] = useState<
+    'idle' | 'working' | 'done' | 'error'
+  >('idle');
+  // 병합 없이 "이 기기 데이터가 맞다"고 확정할 때: pull/merge를 건너뛰고
+  // 로컬 전체를 그대로 원격에 덮어쓴다. 다른 기기가 그새 올린, 여기 없는 변경은 사라질 수 있음.
+  const handleForcePush = async () => {
+    if (
+      !window.confirm(
+        '이 기기의 현재 데이터로 GitHub 원격 백업을 덮어씁니다.\n' +
+          '(다른 기기가 아직 여기로 동기화하지 않은 변경이 있다면 사라질 수 있어요.)\n계속할까요?',
+      )
+    )
+      return;
+    setForcePushState('working');
+    try {
+      const cfg = sync.enabled ? sync : { ...sync, enabled: true };
+      saveSyncConfig(cfg);
+      setSync(cfg);
+      const remote = await pullRemote(cfg).catch(() => null);
+      const data = await dataStore.exportAll();
+      await pushRemote(cfg, data, remote?.sha ?? null);
+      setForcePushState('done');
+    } catch (err) {
+      console.warn('강제 동기화 실패', err);
+      setForcePushState('error');
+    }
+  };
+
+  const [forcePullState, setForcePullState] = useState<
+    'idle' | 'working' | 'done' | 'notfound' | 'error'
+  >('idle');
+  // 병합 없이 "원격이 맞다"고 확정할 때: 이 기기 로컬 데이터를 원격 내용으로 완전히 교체한다.
+  // 다른 기기에서 강제 덮어쓰기를 한 뒤, 이 기기를 정확히 맞출 때 쓴다.
+  const handleForcePull = async () => {
+    if (
+      !window.confirm(
+        '이 기기의 데이터를 GitHub 원격 백업 내용으로 완전히 교체합니다(병합 아님).\n' +
+          '이 기기에만 있던 변경은 사라집니다. 계속할까요?',
+      )
+    )
+      return;
+    setForcePullState('working');
+    try {
+      const cfg = sync.enabled ? sync : { ...sync, enabled: true };
+      saveSyncConfig(cfg);
+      setSync(cfg);
+      const remote = await pullRemote(cfg);
+      if (!remote) {
+        setForcePullState('notfound');
+        return;
+      }
+      await dataStore.importAll(remote.data);
+      setForcePullState('done');
+      window.location.reload();
+    } catch (err) {
+      console.warn('강제 가져오기 실패', err);
+      setForcePullState('error');
+    }
   };
 
   const [query, setQuery] = useState(location?.name ?? '');
@@ -266,7 +328,51 @@ export function SettingsModal({
             <button className="btn btn--ghost" onClick={handleSyncSave}>
               동기화 설정 저장
             </button>
+            <button
+              className="btn btn--ghost"
+              onClick={handleForcePush}
+              disabled={
+                !sync.owner || !sync.repo || !sync.token || forcePushState === 'working'
+              }
+              title="병합하지 않고 이 기기 데이터로 원격을 그대로 덮어씁니다"
+            >
+              {forcePushState === 'working'
+                ? '덮어쓰는 중…'
+                : '① 이 기기 → 원격 강제 덮어쓰기'}
+            </button>
           </div>
+          {forcePushState === 'done' && (
+            <div className="modal__badge">
+              완료. 다른 기기에서 ②번 버튼으로 이 내용을 그대로 받아가면 됩니다.
+            </div>
+          )}
+          {forcePushState === 'error' && (
+            <div className="modal__badge">
+              실패했어요. 설정(owner/repo/token)과 네트워크를 확인하세요.
+            </div>
+          )}
+          <div className="field-row">
+            <button
+              className="btn btn--ghost"
+              onClick={handleForcePull}
+              disabled={
+                !sync.owner || !sync.repo || !sync.token || forcePullState === 'working'
+              }
+              title="병합하지 않고 원격 내용으로 이 기기를 그대로 교체합니다"
+            >
+              {forcePullState === 'working'
+                ? '가져오는 중…'
+                : '② 원격 → 이 기기 강제 교체(가져오기)'}
+            </button>
+          </div>
+          {forcePullState === 'notfound' && (
+            <div className="modal__badge">원격에 아직 동기화 파일이 없어요.</div>
+          )}
+          {forcePullState === 'error' && (
+            <div className="modal__badge">
+              실패했어요. 설정(owner/repo/token)과 네트워크를 확인하세요.
+            </div>
+          )}
         </div>
 
         <div className="modal__footer">
